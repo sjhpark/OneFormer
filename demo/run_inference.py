@@ -1,20 +1,28 @@
 # ------------------------------------------------------------------------------
-# Reference: https://github.com/facebookresearch/Mask2Former/blob/main/demo/demo.py
+# Reference 1: https://github.com/facebookresearch/Mask2Former/blob/main/demo/demo.py
 # Modified by Jitesh Jain (https://github.com/praeclarumjj3)
+# Reference 2: https://github.com/SHI-Labs/OneFormer/blob/main/demo/demo.py
+# Modified by Sam Park (https://github.com/sjhpark)
 # ------------------------------------------------------------------------------
+import warnings
+# Turn off all warnings
+warnings.filterwarnings("ignore")
+
+import logging
+# Disable all logging
+logging.disable(logging.CRITICAL)
+# Enable tqdm logging
+logging.getLogger("tqdm").setLevel(logging.INFO)
 
 import argparse
 import multiprocessing as mp
 import os
 import torch
 import random
-# fmt: off
 import sys
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
-# fmt: on
 
 import time
-import cv2
 import numpy as np
 import tqdm
 
@@ -55,21 +63,18 @@ def get_parser():
     parser = argparse.ArgumentParser(description="oneformer demo for builtin configs")
     parser.add_argument(
         "--config-file",
-        default="../configs/ade20k/swin/oneformer_swin_large_IN21k_384_bs16_160k.yaml",
+        default="../configs/coco/dinat/oneformer_dinat_large_bs16_100ep.yaml",
         metavar="FILE",
         help="path to config file",
     )
+
     parser.add_argument("--task", help="Task type")
+
     parser.add_argument(
         "--input",
-        nargs="+",
-        help="A list of space separated input images; "
-        "or a single glob pattern such as 'directory/*.jpg'",
-    )
-    parser.add_argument(
-        "--output",
-        help="A file or directory to save output visualizations. "
-        "If not given, will show output in an OpenCV window.",
+        type=str,
+        default="images_sample",
+        help="directory of where the input images are",
     )
 
     parser.add_argument(
@@ -105,35 +110,26 @@ if __name__ == "__main__":
 
     demo = VisualizationDemo(cfg)
 
-    if args.input:
-        for path in tqdm.tqdm(args.input, disable=not args.output):
-            # use PIL, to be consistent with evaluation
-                
-            img = read_image(path, format="BGR")
-            start_time = time.time()
-            predictions, visualized_output = demo.run_on_image(img, args.task)
-            logger.info(
-                "{}: {} in {:.2f}s".format(
-                    path,
-                    "detected {} instances".format(len(predictions["instances"]))
-                    if "instances" in predictions
-                    else "finished",
-                    time.time() - start_time,
-                )
-            )
-            if args.output:
-                if len(args.input) == 1:
-                    for k in visualized_output.keys():
-                        os.makedirs(k, exist_ok=True)
-                        out_filename = os.path.join(k, args.output)
-                        visualized_output[k].save(out_filename)    
-                else:
-                    for k in visualized_output.keys():
-                        opath = os.path.join(args.output, k)    
-                        os.makedirs(opath, exist_ok=True)
-                        out_filename = os.path.join(opath, os.path.basename(path))
-                        visualized_output[k].save(out_filename)    
-            else:
-                raise ValueError("Please specify an output path!")
-    else:
-        raise ValueError("No Input Given")
+    input_fnames = os.listdir(args.input) # input file names (e.g. sample1.jpg)
+    input_fpaths = [os.path.join(args.input, fname) for fname in input_fnames] # input file paths (e.g. /images/sample1.jpg)
+
+    start_time = time.time()
+    for path in tqdm.tqdm(input_fpaths):
+        # use PIL, to be consistent with evaluation
+        
+        # Run inference
+        img = read_image(path, format="BGR")
+        predictions, visualized_output = demo.run_on_image(img, args.task)
+
+        # Save inferenced image
+        for k in visualized_output.keys():
+            opath = os.path.join(args.input, k)    
+            os.makedirs(opath, exist_ok=True)
+            out_filename = os.path.join(opath, os.path.basename(path))
+            visualized_output[k].save(out_filename)    
+    
+    print(f"Total time elapsed: {(time.time() - start_time):.3f}s")
+    print(f"All the inferenced images are saved in {os.path.join(args.input, k)}")
+
+    # Re-enable all logging at the end of your script if needed
+    logging.disable(logging.NOTSET)
