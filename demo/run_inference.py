@@ -14,6 +14,7 @@ logging.disable(logging.CRITICAL)
 # Enable tqdm logging
 logging.getLogger("tqdm").setLevel(logging.INFO)
 
+from natsort import natsorted
 import argparse
 import multiprocessing as mp
 import os
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     demo = VisualizationDemo(cfg)
 
     input_fnames = os.listdir(args.input) # input file names (e.g. sample1.jpg)
-    input_fpaths = [os.path.join(args.input, fname) for fname in input_fnames] # input file paths (e.g. /images/sample1.jpg)
+    input_fpaths = natsorted([os.path.join(args.input, fname) for fname in input_fnames]) # input file paths (e.g. /images/sample1.jpg)
 
     start_time = time.time()
     for path in tqdm.tqdm(input_fpaths):
