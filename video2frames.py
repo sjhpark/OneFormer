@@ -1,10 +1,12 @@
 import cv2
 import os
 import argparse
+from tqdm import tqdm
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', type=str, default=None, help='path to the video to be converted to frames')
+    parser.add_argument('--fps', type=int, default=None, help='fps of the video')
     parser.add_argument('--save_dir', type=str, default="images_samples", help='directory to save the frames')
     args = parser.parse_args()
 
@@ -18,21 +20,30 @@ if __name__ == "__main__":
     # video
     video = cv2.VideoCapture(args.path)
 
-    # fps of the video
+    # original fps of the video
     fps = int(video.get(cv2.CAP_PROP_FPS))
-    print(f"FPS of the video: {fps}")
+    print(f"Original FPS of the video: {fps}")
 
-    # Total frames in the video
+    # total frames in the video
     frames_tot = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
     print(f"Total frames in the video: {frames_tot}")
+
+    # desired fps of the video
+    fps_desired = args.fps
+    print(f"Desired FPS of the video: {fps_desired}")
+
+    # desired frames in the video
+    frames_desired = round(frames_tot * fps_desired / fps)
+    print(f"Desired frames in the video: {frames_desired}")
 
     # convert to & save frames
     success = True
     count = 0
-    while success:
+    # while success:
+    for i in tqdm(range(frames_tot), desc="Converting video to frames"):
         success, image = video.read()
-        if success:
+        if success and count % int(fps / fps_desired) == 0:
             cv2.imwrite(os.path.join(save_dir, "frame%d.jpg" % count), image)  # save frame as JPEG file
-            print(f"A frame captured at {count}th frame.")
-            count += 1
+        count += 1
     print(f"Video-to-Frames conversion is complete. All the frames are saved in {args.save_dir}")
+    print(f"Total frames captured: {len(os.listdir(args.save_dir))}")
