@@ -3,53 +3,24 @@
 # Modified and Refactored by Sam Park (https://github.com/sjhpark)
 # ------------------------------------------------------------------------------
 
-"""
-<Example: How to run this file>
-python demo.py --config-file ../configs/coco/dinat/oneformer_dinat_large_bs16_100ep.yaml\
-  --input ../sample_imgs/frame6250.jpg \
-  --output ../semantic_inference/frame6250_semantic_coco_dinat   \
-  --task semantic \
-  --opts MODEL.IS_TRAIN False MODEL.IS_DEMO True MODEL.WEIGHTS ../checkpoints/150_16_dinat_l_oneformer_coco_100ep.pth
+import warnings
+warnings.filterwarnings("ignore") # Turn off all warnings
 
-python demo.py --config-file ../configs/coco/swin/oneformer_swin_large_bs16_100ep.yaml\
-  --input ../sample_imgs/frame6250.jpg \
-  --output ../semantic_inference/frame6250_semantic_coco_swin   \
-  --task semantic \
-  --opts MODEL.IS_TRAIN False MODEL.IS_DEMO True MODEL.WEIGHTS ../checkpoints/150_16_swin_l_oneformer_coco_100ep.pth
+import logging
+logging.disable(logging.CRITICAL) # Disable all logging
+logging.getLogger("tqdm").setLevel(logging.INFO) # Enable tqdm logging
 
-python demo.py --config-file ../configs/cityscapes/dinat/oneformer_dinat_large_bs16_90k.yaml\
-  --input ../sample_imgs/frame6250.jpg \
-  --output ../semantic_inference/frame6250_semantic_cityscapes_dinat   \
-  --task semantic \
-  --opts MODEL.IS_TRAIN False MODEL.IS_DEMO True MODEL.WEIGHTS ../checkpoints/250_16_dinat_l_oneformer_cityscapes_90k.pth
-"""
-
-import argparse
-import multiprocessing as mp
 import os
-import torch
-import random
-
+import sys
+import cv2
+import time
+import argparse
+from tqdm import tqdm
+from natsort import natsorted
 from defaults import DefaultPredictor
 from visualizer import Visualizer, ColorMode
 
-# fmt: off
-import sys
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
-# fmt: on
-
-# Import libraries
-import numpy as np
-import cv2
-import torch
-
-sys.path.insert(2, os.path.join(sys.path[1], 'detectron2/'))
-# Import detectron2 utilities
-from detectron2.config import get_cfg
-from detectron2.projects.deeplab import add_deeplab_config
-from detectron2.data import MetadataCatalog
-
-
 # import OneFormer Project
 from oneformer import (
     add_oneformer_config,
@@ -57,16 +28,30 @@ from oneformer import (
     add_swin_config,
     add_dinat_config,
     add_convnext_config,
-)
+  )
 
-device = torch.device("cuda")
-SWIN_CFG_DICT = {"cityscapes": "configs/cityscapes/oneformer_swin_large_IN21k_384_bs16_90k.yaml",
-            "coco": "../configs/coco/swin/oneformer_swin_large_IN21k_384_bs16_100ep.yaml",
-            "ade20k": "configs/ade20k/oneformer_swin_large_IN21k_384_bs16_160k.yaml",}
+SWIN_CFG_DICT = {"cityscapes": "../configs/cityscapes/swin/oneformer_swin_large_bs16_90k.yaml",
+                "coco": "../configs/coco/swin/oneformer_swin_large_IN21k_384_bs16_100ep.yaml",
+                "ade20k": "../configs/ade20k/swin/oneformer_swin_large_bs16_160k.yaml",}
 
-DINAT_CFG_DICT = {"cityscapes": "configs/cityscapes/oneformer_dinat_large_bs16_90k.yaml",
-            "coco": "../configs/coco/dinat/oneformer_dinat_large_bs16_100ep.yaml",
-            "ade20k": "configs/ade20k/oneformer_dinat_large_IN21k_384_bs16_160k.yaml",}
+DINAT_CFG_DICT = {"cityscapes": "../configs/cityscapes/dinat/oneformer_dinat_large_bs16_90k.yaml",
+                "coco": "../configs/coco/dinat/oneformer_dinat_large_bs16_100ep.yaml",
+                "ade20k": "../configs/ade20k/dinat/oneformer_dinat_large_bs16_160k.yaml",}
+
+SWIN_CHECKPOINT_DICT = {"cityscapes": "../checkpoints/250_16_swin_l_oneformer_ade20k_160k.pth",
+                        "coco": "../checkpoints/150_16_swin_l_oneformer_coco_100ep.pth",
+                        "ade20k": "../checkpoints/250_16_swin_l_oneformer_ade20k_160k.pth",}
+
+DINAT_CHECKPOINT_DICT = {"cityscapes": "../checkpoints/250_16_dinat_l_oneformer_cityscapes_90k.pth",
+                        "coco": "../checkpoints/150_16_dinat_l_oneformer_coco_100ep.pth",
+                        "ade20k": "../checkpoints/250_16_dinat_l_oneformer_ade20k_160k.pth",}
+
+sys.path.insert(2, os.path.join(sys.path[1], 'detectron2/'))
+# Import detectron2 utilities
+from detectron2.config import get_cfg
+from detectron2.projects.deeplab import add_deeplab_config
+from detectron2.data import MetadataCatalog
+
 
 def setup_cfg(dataset, model_path, use_swin):
     # load config from file and command-line arguments
@@ -123,16 +108,41 @@ TASK_INFER = {"panoptic": panoptic_run,
               "instance": instance_run, 
               "semantic": semantic_run}
 
-predictor, metadata = setup_modules("coco", "../checkpoints/150_16_dinat_l_oneformer_coco_100ep.pth", use_swin=False)
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description="oneformer demo for builtin configs")
+  parser.add_argument("--in_dir", type=str, help="Directory of where the input images are")
+  parser.add_argument("--model", type=str, default="dinat", help="Model (swin or dinat)")
+  parser.add_argument("--prior", type=str, default="coco", help="Pretrained weights (coco, cityscapes, or ade20k)")
+  parser.add_argument("--task", type=str, default="semantic", help="Task type")
+  args = parser.parse_args()
 
-img_name = 'ski.png'
-img = f'../sample_imgs/{img_name}'
-img = cv2.imread(img)
-task = "semantic" #@param
-print(f"Running inference...")
-out = TASK_INFER[task](img, predictor, metadata).get_image()
-out = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
-# save the output image
-out_name = f'../demo/semantic_inference/{img_name[:-4]}_semantic_coco_dinat_colab_demo.png'
-cv2.imwrite(out_name, out)
-print(f"Output image saved as {out_name}")
+  if args.in_dir is None:
+    raise ValueError("Please specify the directory of input images")
+
+  task = args.task
+  model = args.model
+  prior = args.prior
+
+  if model == "swin":
+    use_swin = True
+    checkpoint = SWIN_CHECKPOINT_DICT[prior]
+  elif model == "dinat":
+    use_swin = False
+    checkpoint = DINAT_CHECKPOINT_DICT[prior]
+  predictor, metadata = setup_modules(prior, checkpoint, use_swin)
+
+  images = os.listdir(args.in_dir)
+  start = time.time()
+  for img_name in tqdm(images, desc="Running inference..."):
+      img = f'{args.in_dir}/{img_name}'
+      img = cv2.imread(img)
+      out = TASK_INFER[task](img, predictor, metadata).get_image()
+      out = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
+      if not os.path.exists(f'{args.in_dir}/inference'):
+        os.makedirs(f'{args.in_dir}/inference')
+      out_name = f'{args.in_dir}/inference/{img_name[:-4]}_semantic_{prior}_{model}.png'
+      cv2.imwrite(out_name, out)
+  end = time.time()
+  print(f"Total inference time on {len(images)} images: {end-start:.2f}s")
+
+  logging.disable(logging.NOTSET) # Re-enable all logging at the end of your script if needed
