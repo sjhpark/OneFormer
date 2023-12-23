@@ -8,7 +8,7 @@ from natsort import natsorted
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--in_dir', type=str, default=None, help='Directory of where the input images are')
-    parser.add_argument('--scale', nargs='+', type=float, default=[0.25,0.25], help='fx and fy for resizing')
+    parser.add_argument('--scale', nargs='+', type=float, default=[0.5,0.5], help='fx and fy for resizing')
     args = parser.parse_args()
 
     assert args.in_dir is not None, "Please provide the path to the video to be converted to images"
