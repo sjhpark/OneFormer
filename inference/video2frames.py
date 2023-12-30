@@ -5,14 +5,10 @@ from tqdm import tqdm
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--path', type=str, default=None, help='path to the video to be converted to frames')
-    parser.add_argument('--fps', type=int, default=None, help='fps of the video')
-    parser.add_argument('--save_dir', type=str, default=None, help='directory to save the frames')
+    parser.add_argument('--path', type=str, default=None, help='path to the video to be converted to frames (e.g. sample_videos/vid1.mkv)', required=True)
+    parser.add_argument('--fps', type=int, default=None, help='fps of the video', required=True)
+    parser.add_argument('--save_dir', type=str, default='frames', help='directory to save the frames')
     args = parser.parse_args()
-
-    assert args.path is not None, "Please provide the path to the video to be converted to frames"
-    assert args.fps is not None, "Please provide the fps of the video"
-    assert args.save_dir is not None, "Please provide the directory to save the frames"
 
     # save dir
     save_dir = args.save_dir
@@ -45,7 +41,7 @@ if __name__ == "__main__":
     for i in tqdm(range(frames_tot), desc="Converting video to frames"):
         success, image = video.read()
         if success and count % int(fps / fps_desired) == 0:
-            cv2.imwrite(os.path.join(save_dir, "frame%d.jpg" % count), image)  # save frame as JPEG file
+            cv2.imwrite(os.path.join(save_dir, f"frame_{count}.png"), image)
         count += 1
     print(f"Video-to-Frames conversion is complete. All the frames are saved in {args.save_dir}")
     print(f"Total frames captured: {len(os.listdir(args.save_dir))}")

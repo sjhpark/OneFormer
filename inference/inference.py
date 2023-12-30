@@ -17,6 +17,7 @@ import time
 import argparse
 from tqdm import tqdm
 from natsort import natsorted
+import pickle
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from demo.defaults import DefaultPredictor
@@ -76,18 +77,14 @@ def setup_cfg(dataset, model_path, use_swin):
 def setup_modules(dataset, model_path, use_swin):
     cfg = setup_cfg(dataset, model_path, use_swin)
     predictor = DefaultPredictor(cfg)
-    metadata = MetadataCatalog.get(
-        cfg.DATASETS.TEST_PANOPTIC[0] if len(cfg.DATASETS.TEST_PANOPTIC) else "__unused"
-    )
+    metadata = MetadataCatalog.get(cfg.DATASETS.TEST_PANOPTIC[0] if len(cfg.DATASETS.TEST_PANOPTIC) else "__unused")
     return predictor, metadata
 
 def panoptic_run(img, predictor, metadata):
     visualizer = Visualizer(img[:, :, ::-1], metadata=metadata, instance_mode=ColorMode.IMAGE)
     predictions = predictor(img, "panoptic")
     panoptic_seg, segments_info = predictions["panoptic_seg"]
-    out = visualizer.draw_panoptic_seg_predictions(
-    panoptic_seg.to('cpu'), segments_info, alpha=0.5
-)
+    out = visualizer.draw_panoptic_seg_predictions(panoptic_seg.to('cpu'), segments_info, alpha=0.5)
     return out
 
 def instance_run(img, predictor, metadata):
@@ -97,12 +94,17 @@ def instance_run(img, predictor, metadata):
     out = visualizer.draw_instance_predictions(predictions=instances, alpha=0.5)
     return out
 
-def semantic_run(img, predictor, metadata):
+def semantic_run(img, predictor, metadata, pixel_class, img_name):
     visualizer = Visualizer(img[:, :, ::-1], metadata=metadata, instance_mode=ColorMode.IMAGE)
     predictions = predictor(img, "semantic")
-    out = visualizer.draw_sem_seg(
-        predictions["sem_seg"].argmax(dim=0).to('cpu'), alpha=0.5
-    )
+
+    '''
+    predictions["sem_seg"].argmax(dim=0) is a tensor of shape (H, W) with values from metadata.stuff_classes
+    - metadata.stuff_classes (stuff classes = 80 thing classes + 53 extra classes)
+    '''
+    pixel_class[img_name[:-4]] = predictions["sem_seg"].argmax(dim=0).to('cpu') # dict of {img_name: 2D tensor of predicted pixel classes}
+
+    out = visualizer.draw_sem_seg(predictions["sem_seg"].argmax(dim=0).to('cpu'), alpha=0.5)
     return out
 
 TASK_INFER = {"panoptic": panoptic_run, 
@@ -111,13 +113,11 @@ TASK_INFER = {"panoptic": panoptic_run,
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="oneformer demo for builtin configs")
-  parser.add_argument("--in_dir", type=str, help="Directory of where the input images are")
+  parser.add_argument("--in_dir", type=str, help="Directory of where the input images are", required=True)
   parser.add_argument("--model", type=str, default="dinat", help="Model (swin or dinat)")
   parser.add_argument("--prior", type=str, default="coco", help="Pretrained weights (coco, cityscapes, or ade20k)")
   parser.add_argument("--task", type=str, default="semantic", help="Task type")
   args = parser.parse_args()
-
-  assert args.in_dir is not None, "Please provide the directory of where the input images are"
 
   task = args.task
   model = args.model
@@ -133,16 +133,23 @@ if __name__ == "__main__":
   
   images = natsorted(os.listdir(args.in_dir))
   start = time.time()
+  pixel_class = {}
   for img_name in tqdm(images, desc="Running inference..."):
       if not os.path.exists(f'{args.in_dir}/inferenced'):
         os.makedirs(f'{args.in_dir}/inferenced')
       img = f'{args.in_dir}/{img_name}'
       img = cv2.imread(img)
-      out = TASK_INFER[task](img, predictor, metadata).get_image()
+      out = TASK_INFER[task](img, predictor, metadata, pixel_class, img_name).get_image()
       out = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
-      out_name = f'{args.in_dir}/inferenced/{img_name[:-4]}_semantic_{prior}_{model}.png'
+      out_name = f'{args.in_dir}/inferenced/semantic_{prior}_{model}_{img_name[:-4]}.png'
       cv2.imwrite(out_name, out)
   print(f"Inference is complete. All the images are saved in {args.in_dir}/inferenced")
   print(f"Total inference time on {len(images)} images: {(time.time() - start):.2f}s")
+
+  print("Saving pixel_class.pkl...")
+  pixel_class_path = f"{args.in_dir}/inferenced/pixel_class.pkl"
+  with open(pixel_class_path, "wb") as file:
+      pickle.dump(pixel_class, file)
+  print(f"pixel_class.pkl is saved in {pixel_class_path}")
 
   logging.disable(logging.NOTSET) # Re-enable all logging at the end of your script if needed
