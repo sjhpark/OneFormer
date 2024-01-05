@@ -78,6 +78,8 @@ def setup_modules(dataset, model_path, use_swin):
     cfg = setup_cfg(dataset, model_path, use_swin)
     predictor = DefaultPredictor(cfg)
     metadata = MetadataCatalog.get(cfg.DATASETS.TEST_PANOPTIC[0] if len(cfg.DATASETS.TEST_PANOPTIC) else "__unused")
+    # # Uncomment the line below to see the list of stuff classes
+    # print(metadata.stuff_classes)
     return predictor, metadata
 
 def panoptic_run(img, predictor, metadata):
