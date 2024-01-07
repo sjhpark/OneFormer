@@ -11,7 +11,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # save dir
-    save_dir = args.save_dir
+    save_dir = args.save_dir + f"_{args.fps}fps"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
