@@ -4,6 +4,8 @@
 # ------------------------------------------------------------------------------
 
 import torch
+# import os
+# import sys
 # sys.path.insert(2, os.path.join(sys.path[1], 'detectron2/'))
 import detectron2.data.transforms as T
 from detectron2.checkpoint import DetectionCheckpointer
