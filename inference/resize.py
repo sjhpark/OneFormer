@@ -21,7 +21,7 @@ if __name__ == "__main__":
         img = f'{args.in_dir}/{img_name}'
         img = cv2.imread(img)
         out = cv2.resize(img, (0,0), fx=args.scale[0], fy=args.scale[1], interpolation=cv2.INTER_NEAREST)
-        out_name = f'{args.in_dir}/resized/resized_{img_name[:-4]}.png'
+        out_name = f'{args.in_dir}/resized/resized{img_name[:-4]}.png'
         cv2.imwrite(out_name, out)
     print(f"Resizing images is complete. All the images are saved in {args.in_dir}/resized")
     print(f"Total time elapsed: {(time.time() - start):.2f}s")

@@ -17,7 +17,7 @@ import time
 import argparse
 from tqdm import tqdm
 from natsort import natsorted
-import pickle
+import pandas as pd
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from demo.defaults import DefaultPredictor
@@ -96,7 +96,7 @@ def instance_run(img, predictor, metadata):
     out = visualizer.draw_instance_predictions(predictions=instances, alpha=0.5)
     return out
 
-def semantic_run(img, predictor, metadata, pixel_class, img_name):
+def semantic_run(img, predictor, metadata, img_name, gaze_loc):
     visualizer = Visualizer(img[:, :, ::-1], metadata=metadata, instance_mode=ColorMode.IMAGE)
     predictions = predictor(img, "semantic")
 
@@ -104,10 +104,16 @@ def semantic_run(img, predictor, metadata, pixel_class, img_name):
     predictions["sem_seg"].argmax(dim=0) is a tensor of shape (H, W) with values from metadata.stuff_classes
     - metadata.stuff_classes (stuff classes = 80 thing classes + 53 extra classes)
     '''
-    pixel_class[img_name[:-4]] = predictions["sem_seg"].argmax(dim=0).to('cpu') # dict of {img_name: 2D tensor of predicted pixel classes}
+    # pixel_class[img_name[:-4]] = predictions["sem_seg"].argmax(dim=0).to('cpu') # dict of {img_name: 2D tensor of predicted pixel classes}
+    pixel_classes = predictions["sem_seg"].argmax(dim=0).to('cpu')
+    H, W = pixel_classes.shape
+    x_in_scene, y_in_scene = gaze_loc
+    x_in_img = int(round(x_in_scene * W))
+    y_in_img = int(round(y_in_scene * H))
+    pixel_class = pixel_classes[y_in_img, x_in_img].item()
 
-    out = visualizer.draw_sem_seg(predictions["sem_seg"].argmax(dim=0).to('cpu'), alpha=0.5)
-    return out
+    # out = visualizer.draw_sem_seg(predictions["sem_seg"].argmax(dim=0).to('cpu'), alpha=0.5)
+    return pixel_class
 
 TASK_INFER = {"panoptic": panoptic_run, 
               "instance": instance_run, 
@@ -133,25 +139,24 @@ if __name__ == "__main__":
     checkpoint = DINAT_CHECKPOINT_DICT[prior]
   predictor, metadata = setup_modules(prior, checkpoint, use_swin)
   
+  # gaze projection data (contains scene gaze location for each frame)
+  file = "gaze_data/gaze_projection.csv"
+  df = pd.read_csv(file, sep=",")
+
+  # run segmentation inference on each frame
   images = natsorted(os.listdir(args.in_dir))
-  start = time.time()
-  pixel_class = {}
   for img_name in tqdm(images, desc="Running inference..."):
-      if not os.path.exists(f'{args.in_dir}/inferenced'):
-        os.makedirs(f'{args.in_dir}/inferenced')
+    img_num = int(img_name.split("_")[1].split(".")[0]) # image name is in the format of "frame_000000.png"; image_num helps you track fps (e.g. #10 means 10*1/60 seconds in the 60fps video)
+    gaze_loc = (df.iloc[img_num].x_in_scene, df.iloc[img_num].y_in_scene) # scene gaze location as a tuple of (x_in_scene, y_in_scene)
+    if gaze_loc == (-1, -1): # if no scene gaze data is available
+      pixel_class = -1
+    else:
       img = f'{args.in_dir}/{img_name}'
       img = cv2.imread(img)
-      out = TASK_INFER[task](img, predictor, metadata, pixel_class, img_name).get_image()
-      out = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
-      out_name = f'{args.in_dir}/inferenced/semantic_{prior}_{model}_{img_name[:-4]}.png'
-      cv2.imwrite(out_name, out)
-  print(f"Inference is complete. All the images are saved in {args.in_dir}/inferenced")
-  print(f"Total inference time on {len(images)} images: {(time.time() - start):.2f}s")
+      pixel_class = TASK_INFER[task](img, predictor, metadata, img_name, gaze_loc)
+      df.loc[img_num, "pixel_class"] = pixel_class
 
-  print("Saving pixel_class.pkl...")
-  pixel_class_path = f"{args.in_dir}/inferenced/pixel_class.pkl"
-  with open(pixel_class_path, "wb") as file:
-      pickle.dump(pixel_class, file)
-  print(f"pixel_class.pkl is saved in {pixel_class_path}")
-
+  df.iloc[:, -1] = df.iloc[:, -1].fillna(-1) # replace NaN in the pixel class column with -1
+  df.to_csv(f"{file[:-4]}_pixel_class.csv", index=False) # save
+  print(f"All the pixel classes are saved in {file[:-4]}_pixel_class.csv")
   logging.disable(logging.NOTSET) # Re-enable all logging at the end of your script if needed
