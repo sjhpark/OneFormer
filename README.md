@@ -1,5 +1,7 @@
 # Segmentation Inference of Recorded Flight Operation Video Frames
+
 ## Setup Instructions
+
 - Install NVIDIA CUDA Toolkit 11.3
   ```bash
   sudo apt update
@@ -70,15 +72,19 @@
   ```
 
 ## Segmentation Inference
+
 - Run segmentation inference
 ```bash
 cd inference
+
 # Chop video into frames
-python3 video2frames.py --path {your video path e.g. vids/P00_OBS.mkv} --fps {e.g. 15}
+python video2frames.py --path {your video path e.g. vids/P00_OBS.mkv} --fps {e.g. 15}
+
 # Resize each extracted frame
-python3 resize.py --in_dir {your frames path e.g. frames_fps15} --scale 0.5 0.5
+python resize.py --in_dir {your frames path e.g. frames_fps15} --scale 0.5 0.5
+
 # Run inference and record
-python3 inference.py --in_dir {your frames path e.g. frames_fps15/resized}
+python inference.py --in_dir {your frames path e.g. frames_fps15/resized} --gaze_path {Path to the gaze data e.g. gaze_data/gaze_projection} --model dinat --prior coco --task semantic
 ```
 
 # OneFormer: One Transformer to Rule Universal Image Segmentation
