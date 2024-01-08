@@ -54,6 +54,7 @@ from detectron2.config import get_cfg
 from detectron2.projects.deeplab import add_deeplab_config
 from detectron2.data import MetadataCatalog
 
+
 def setup_cfg(dataset, model_path, use_swin):
     # load config from file and command-line arguments
     cfg = get_cfg()
@@ -95,8 +96,7 @@ def instance_run(img, predictor, metadata):
     out = visualizer.draw_instance_predictions(predictions=instances, alpha=0.5)
     return out
 
-def semantic_run(img, predictor, metadata, img_name, gaze_loc):
-    visualizer = Visualizer(img[:, :, ::-1], metadata=metadata, instance_mode=ColorMode.IMAGE)
+def semantic_run(img, predictor, gaze_loc):
     predictions = predictor(img, "semantic")
 
     '''
@@ -106,8 +106,9 @@ def semantic_run(img, predictor, metadata, img_name, gaze_loc):
     # pixel_class[img_name[:-4]] = predictions["sem_seg"].argmax(dim=0).to('cpu') # dict of {img_name: 2D tensor of predicted pixel classes}
     pixel_classes = predictions["sem_seg"].argmax(dim=0).to('cpu')
     H, W = pixel_classes.shape
+    
     x_in_scene, y_in_scene = gaze_loc
-    if not 0 < abs(x_in_scene) < 1 or not 0 < abs(y_in_scene) < 1: # x or y > 1 usually means the gaze location was outside of the scene (or screen)
+    if not 0 <= x_in_scene <= 1 or not 0 <= y_in_scene <= 1: # x or y > 1 usually means the gaze location was outside of the scene (or screen)
       pixel_class = -1
     else:
       x_in_img = int(round(x_in_scene * W))
@@ -158,7 +159,7 @@ if __name__ == "__main__":
     else:
       img = f'{args.in_dir}/{img_name}'
       img = cv2.imread(img)
-      pixel_class = TASK_INFER[task](img, predictor, metadata, img_name, gaze_loc)
+      pixel_class = TASK_INFER[task](img, predictor, gaze_loc)
       df.loc[img_num, "pixel_class"] = pixel_class
 
   df.iloc[:, -1] = df.iloc[:, -1].fillna(-1) # replace NaN in the pixel class column with -1
