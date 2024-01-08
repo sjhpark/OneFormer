@@ -78,7 +78,7 @@
 cd inference
 
 # Chop video into frames
-python video2frames.py --path {your video path e.g. vids/P00_OBS.mkv} --fps {e.g. 15}
+python video2frames.py --path {your video path e.g. vids/P00_OBS.mkv} --fps {e.g. 15} --id {participant ID e.g. P00}
 
 # Resize each extracted frame
 python resize.py --in_dir {your frames path e.g. frames_fps15} --scale 0.5 0.5

@@ -5,13 +5,14 @@ from tqdm import tqdm
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--id', type=str, help='Participant ID  (e.g. P00), required=True')
     parser.add_argument('--path', type=str, default=None, help='path to the video to be converted to frames (e.g. sample_videos/vid1.mkv)', required=True)
     parser.add_argument('--fps', type=int, default=None, help='fps of the video', required=True)
     parser.add_argument('--save_dir', type=str, default='frames', help='directory to save the frames')
     args = parser.parse_args()
 
     # save dir
-    save_dir = args.save_dir + f"_{args.fps}fps"
+    save_dir = f"{args.id}_" + args.save_dir + f"_{args.fps}fps"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 

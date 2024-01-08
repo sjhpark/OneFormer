@@ -103,10 +103,9 @@ def semantic_run(img, predictor, gaze_loc):
     predictions["sem_seg"].argmax(dim=0) is a tensor of shape (H, W) with values from metadata.stuff_classes
     - metadata.stuff_classes (stuff classes = 80 thing classes + 53 extra classes)
     '''
-    # pixel_class[img_name[:-4]] = predictions["sem_seg"].argmax(dim=0).to('cpu') # dict of {img_name: 2D tensor of predicted pixel classes}
     pixel_classes = predictions["sem_seg"].argmax(dim=0).to('cpu')
     H, W = pixel_classes.shape
-    
+
     x_in_scene, y_in_scene = gaze_loc
     if not 0 <= x_in_scene <= 1 or not 0 <= y_in_scene <= 1: # x or y > 1 usually means the gaze location was outside of the scene (or screen)
       pixel_class = -1
