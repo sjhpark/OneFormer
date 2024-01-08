@@ -54,7 +54,6 @@ from detectron2.config import get_cfg
 from detectron2.projects.deeplab import add_deeplab_config
 from detectron2.data import MetadataCatalog
 
-
 def setup_cfg(dataset, model_path, use_swin):
     # load config from file and command-line arguments
     cfg = get_cfg()
@@ -108,11 +107,13 @@ def semantic_run(img, predictor, metadata, img_name, gaze_loc):
     pixel_classes = predictions["sem_seg"].argmax(dim=0).to('cpu')
     H, W = pixel_classes.shape
     x_in_scene, y_in_scene = gaze_loc
-    x_in_img = int(round(x_in_scene * W))
-    y_in_img = int(round(y_in_scene * H))
-    pixel_class = pixel_classes[y_in_img, x_in_img].item()
-
-    # out = visualizer.draw_sem_seg(predictions["sem_seg"].argmax(dim=0).to('cpu'), alpha=0.5)
+    if not 0 < abs(x_in_scene) < 1 or not 0 < abs(y_in_scene) < 1: # x or y > 1 usually means the gaze location was outside of the scene (or screen)
+      pixel_class = -1
+    else:
+      x_in_img = int(round(x_in_scene * W))
+      y_in_img = int(round(y_in_scene * H))
+      pixel_class = pixel_classes[y_in_img, x_in_img].item()
+    
     return pixel_class
 
 TASK_INFER = {"panoptic": panoptic_run, 
@@ -120,8 +121,13 @@ TASK_INFER = {"panoptic": panoptic_run,
               "semantic": semantic_run}
 
 if __name__ == "__main__":
+  """
+  This script runs task (semantic) inference on extracted OBS frames and saves semantic pixel class per frame in a csv file.
+  Currently, not applied for panoptic and instance tasks.
+  """
   parser = argparse.ArgumentParser(description="oneformer demo for builtin configs")
   parser.add_argument("--in_dir", type=str, help="Directory of where the input images are", required=True)
+  parser.add_argument("--gaze_path", type=str, help="Path to the gaze data (e.g. gaze_data/gaze_projection)", required=True)
   parser.add_argument("--model", type=str, default="dinat", help="Model (swin or dinat)")
   parser.add_argument("--prior", type=str, default="coco", help="Pretrained weights (coco, cityscapes, or ade20k)")
   parser.add_argument("--task", type=str, default="semantic", help="Task type")
@@ -140,8 +146,7 @@ if __name__ == "__main__":
   predictor, metadata = setup_modules(prior, checkpoint, use_swin)
   
   # gaze projection data (contains scene gaze location for each frame)
-  file = "gaze_data/gaze_projection.csv"
-  df = pd.read_csv(file, sep=",")
+  df = pd.read_csv(args.gaze_path, sep=",")
 
   # run segmentation inference on each frame
   images = natsorted(os.listdir(args.in_dir))
@@ -157,6 +162,7 @@ if __name__ == "__main__":
       df.loc[img_num, "pixel_class"] = pixel_class
 
   df.iloc[:, -1] = df.iloc[:, -1].fillna(-1) # replace NaN in the pixel class column with -1
-  df.to_csv(f"{file[:-4]}_pixel_class.csv", index=False) # save
-  print(f"All the pixel classes are saved in {file[:-4]}_pixel_class.csv")
+  df.to_csv(f"{args.gaze_path[:-4]}_{task}.csv", index=False) # save the dataframe as a csv file
+  print(f"Inference is complete. All the pixel classes of the frames are saved in {args.gaze_path[:-4]}_{task}.csv")
+
   logging.disable(logging.NOTSET) # Re-enable all logging at the end of your script if needed
