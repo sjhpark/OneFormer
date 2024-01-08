@@ -44,5 +44,5 @@ if __name__ == "__main__":
         if success and count % int(fps / fps_desired) == 0:
             cv2.imwrite(os.path.join(save_dir, f"frame_{count}.png"), image)
         count += 1
-    print(f"Video-to-Frames conversion is complete. All the frames are saved in {args.save_dir}")
-    print(f"Total frames captured: {len(os.listdir(args.save_dir))}")
+    print(f"Video-to-Frames conversion is complete. All the frames are saved in {save_dir}")
+    print(f"Total frames captured: {len(os.listdir(save_dir))}")
