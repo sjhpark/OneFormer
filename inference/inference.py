@@ -54,7 +54,6 @@ from detectron2.config import get_cfg
 from detectron2.projects.deeplab import add_deeplab_config
 from detectron2.data import MetadataCatalog
 
-
 def setup_cfg(dataset, model_path, use_swin):
     # load config from file and command-line arguments
     cfg = get_cfg()
@@ -78,8 +77,12 @@ def setup_modules(dataset, model_path, use_swin):
     cfg = setup_cfg(dataset, model_path, use_swin)
     predictor = DefaultPredictor(cfg)
     metadata = MetadataCatalog.get(cfg.DATASETS.TEST_PANOPTIC[0] if len(cfg.DATASETS.TEST_PANOPTIC) else "__unused")
-    # # Uncomment the line below to see the list of stuff classes
-    # print(metadata.stuff_classes)
+
+    classes = {}
+    for i, stuff_class in enumerate(metadata.stuff_classes):
+        classes[i] = stuff_class
+    print(f"Semantic classes:\n{classes}\n")
+
     return predictor, metadata
 
 def panoptic_run(img, predictor, metadata):
@@ -97,12 +100,11 @@ def instance_run(img, predictor, metadata):
     return out
 
 def semantic_run(img, predictor, gaze_loc):
+    """Find the corresponding COCO class of the pixel at the gaze location in the image."""
     predictions = predictor(img, "semantic")
 
-    '''
-    predictions["sem_seg"].argmax(dim=0) is a tensor of shape (H, W) with values from metadata.stuff_classes
-    - metadata.stuff_classes (stuff classes = 80 thing classes + 53 extra classes)
-    '''
+    # predictions["sem_seg"].argmax(dim=0) is a tensor of shape (H, W) with values from metadata.stuff_classes
+    # (stuff_classes = 80 thing classes + 53 extra classes)
     pixel_classes = predictions["sem_seg"].argmax(dim=0).to('cpu')
     H, W = pixel_classes.shape
     
@@ -147,19 +149,26 @@ if __name__ == "__main__":
   
   # gaze projection data (contains scene gaze location for each frame)
   df = pd.read_csv(args.gaze_path, sep=",")
+  scene_baseline_start_frame_num = df.iloc[0].obs_frame_num # starting frame number (beginning of baseline in the scene)
 
   # run segmentation inference on each frame
-  images = natsorted(os.listdir(args.in_dir))
+  images = natsorted(os.listdir(args.in_dir)) # frame names sorted in numerical order
   for img_name in tqdm(images, desc="Running inference..."):
     img_num = int(img_name.split("_")[1].split(".")[0]) # image name is in the format of "frame_000000.png"; image_num helps you track fps (e.g. #10 means 10*1/60 seconds in the 60fps video)
-    gaze_loc = (df.iloc[img_num].x_in_scene, df.iloc[img_num].y_in_scene) # scene gaze location as a tuple of (x_in_scene, y_in_scene)
-    if gaze_loc == (-1, -1): # if no scene gaze data is available
-      pixel_class = -1
-    else:
-      img = f'{args.in_dir}/{img_name}'
-      img = cv2.imread(img)
-      pixel_class = TASK_INFER[task](img, predictor, gaze_loc)
-      df.loc[img_num, "pixel_class"] = pixel_class
+    
+    if img_num >= scene_baseline_start_frame_num:
+      try:
+        idx = df[df['obs_frame_num'] == img_num].index[0] # index of dataframe that contains the scene frame number
+      except IndexError:
+        continue
+      gaze_loc = (df.iloc[idx].obs_gaze_x, df.iloc[idx].obs_gaze_y) # scene gaze location as a tuple of (x_in_scene, y_in_scene)
+      if gaze_loc == (-1, -1): # if no scene gaze data is available
+        pixel_class = -1
+      else:
+        img = f'{args.in_dir}/{img_name}'
+        img = cv2.imread(img)
+        pixel_class = TASK_INFER[task](img, predictor, gaze_loc)
+        df.loc[idx, "pixel_class"] = pixel_class
 
   df.iloc[:, -1] = df.iloc[:, -1].fillna(-1) # replace NaN in the pixel class column with -1
   df.to_csv(f"{args.gaze_path[:-4]}_{task}.csv", index=False) # save the dataframe as a csv file
