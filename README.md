@@ -197,8 +197,7 @@ If you found OneFormer useful in your research, please consider starring ⭐ us 
   ```bash
   cd oneformer/modeling/pixel_decoder/ops
   sh make.sh
-  cd ~
-  cd Oneformer
+  cd ../../../../
   ```
   
 - Download pretrained weights.
@@ -207,7 +206,7 @@ If you found OneFormer useful in your research, please consider starring ⭐ us 
   cd checkpoints
 
   # Download weights of DiNAT model pretrained with COCO dataset
-  wgest https://shi-labs.com/projects/oneformer/coco/150_16_dinat_l_oneformer_coco_100ep.pth
+  wget https://shi-labs.com/projects/oneformer/coco/150_16_dinat_l_oneformer_coco_100ep.pth
   
   cd ..
   ```
