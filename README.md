@@ -1,92 +1,3 @@
-# Segmentation Inference of Recorded Flight Operation Video Frames
-
-## Setup Instructions
-
-- Install NVIDIA CUDA Toolkit 11.3
-  ```bash
-  sudo apt update
-  sudo apt upgrade -y
-
-  mkdir cudatoolkits
-  cd cudatoolkits
-  wget https://developer.download.nvidia.com/compute/cuda/11.3.0/local_installers/cuda_11.3.0_465.19.01_linux.run
-  sudo sh cuda_11.3.0_465.19.01_linux.run --toolkit --silent --override
-  cd ..
-  
-  # Then, open bashrc and set path:
-  nano ~/.bashrc
-  # Paste below into bashrc:
-  export PATH=/usr/local/cuda-11.3/bin${PATH:+:${PATH}}
-  export LD_LIBRARY_PATH=/usr/local/cuda-11.3/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
-
-  # Executes the content of the file passed as an argument in the current shell
-  source ~/.bashrc
-  ```
-
-- Create a conda environment
-  
-  ```bash
-  conda create --name oneformer python=3.8 -y
-  conda activate oneformer
-  ```
-
-- Install packages and other dependencies.
-
-  ```bash
-  git clone https://github.com/sjhpark/OneFormer.git
-  cd OneFormer
-
-  # Install Pytorch
-  conda install pytorch==1.10.1 torchvision==0.11.2 cudatoolkit=11.3 -c pytorch -c conda-forge
-
-  # Install opencv (required for running the demo)
-  pip3 install -U opencv-python
-  
-  # Build Detectron2 from Source (reference: https://github.com/sjhpark/OneFormer/blob/main/INSTALL.md)
-  git clone https://github.com/facebookresearch/detectron2.git
-  python -m pip install -e detectron2
-
-  # Install other dependencies
-  pip3 install git+https://github.com/cocodataset/panopticapi.git
-  pip3 install git+https://github.com/mcordts/cityscapesScripts.git
-  pip3 install -r requirements.txt
-  ```
-
-- Run make.sh file.
-  ```bash
-  cd oneformer/modeling/pixel_decoder/ops
-  sh make.sh
-  cd ~
-  cd Oneformer
-  ```
-  
-- Download pretrained weights.
-  ```bash
-  mkdir checkpoints
-  cd checkpoints
-
-  # Download weights of DiNAT model pretrained with COCO dataset
-  wgest https://shi-labs.com/projects/oneformer/coco/150_16_dinat_l_oneformer_coco_100ep.pth
-  
-  cd ..
-  ```
-
-## Segmentation Inference
-
-- Run segmentation inference
-```bash
-cd inference
-
-# Chop video into frames
-python video2frames.py --path {your video path e.g. vids/P00_OBS.mkv} --fps {e.g. 15} --id {participant ID e.g. P00}
-
-# Resize each extracted frame
-python resize.py --in_dir {your frames path e.g. frames_fps15} --scale 0.5 0.5
-
-# Run inference and record
-python inference.py --in_dir {your frames path e.g. frames_fps15/resized} --gaze_path {Path to the gaze data e.g. gaze_data/gaze_projection} --model dinat --prior coco --task semantic
-```
-
 # OneFormer: One Transformer to Rule Universal Image Segmentation
 
 [![Framework: PyTorch](https://img.shields.io/badge/Framework-PyTorch-orange.svg)](https://pytorch.org/) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/SHI-Labs/OneFormer/blob/main/colab/oneformer_colab.ipynb) [![HuggingFace space](https://img.shields.io/badge/🤗-HuggingFace%20Space-cyan.svg)](https://huggingface.co/spaces/shi-labs/OneFormer) [![HuggingFace transformers](https://img.shields.io/badge/🤗-HuggingFace%20transformers-magenta.svg)](https://huggingface.co/docs/transformers/main/en/model_doc/oneformer) [![YouTube](https://badges.aleen42.com/src/youtube.svg)](https://youtu.be/_Zr1pOi7Chw) [![License](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
@@ -124,6 +35,7 @@ This repo contains the code for our paper **OneFormer: One Transformer to Rule U
     - [Demo](#demo)
 5. [Results](#results)
 6. [Citation](#citation)
+7. [Segmentation Inference on Recorded Flight Operation Video Frames](#segmentation-inference-on-recorded-flight-operation-video-frames)
 
 ## News
 
@@ -225,6 +137,95 @@ If you found OneFormer useful in your research, please consider starring ⭐ us 
       journal={CVPR}, 
       year={2023}
     }
+```
+
+## Segmentation Inference on Recorded Flight Operation Video Frames
+
+### Setup Instructions
+
+- Install NVIDIA CUDA Toolkit 11.3
+  ```bash
+  sudo apt update
+  sudo apt upgrade -y
+
+  mkdir cudatoolkits
+  cd cudatoolkits
+  wget https://developer.download.nvidia.com/compute/cuda/11.3.0/local_installers/cuda_11.3.0_465.19.01_linux.run
+  sudo sh cuda_11.3.0_465.19.01_linux.run --toolkit --silent --override
+  cd ..
+  
+  # Then, open bashrc and set path:
+  nano ~/.bashrc
+  # Paste below into bashrc:
+  export PATH=/usr/local/cuda-11.3/bin${PATH:+:${PATH}}
+  export LD_LIBRARY_PATH=/usr/local/cuda-11.3/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+
+  # Executes the content of the file passed as an argument in the current shell
+  source ~/.bashrc
+  ```
+
+- Create a conda environment
+  
+  ```bash
+  conda create --name oneformer python=3.8 -y
+  conda activate oneformer
+  ```
+
+- Install packages and other dependencies.
+
+  ```bash
+  git clone https://github.com/sjhpark/OneFormer.git
+  cd OneFormer
+
+  # Install Pytorch
+  conda install pytorch==1.10.1 torchvision==0.11.2 cudatoolkit=11.3 -c pytorch -c conda-forge
+
+  # Install opencv (required for running the demo)
+  pip3 install -U opencv-python
+  
+  # Build Detectron2 from Source (reference: https://github.com/sjhpark/OneFormer/blob/main/INSTALL.md)
+  git clone https://github.com/facebookresearch/detectron2.git
+  python -m pip install -e detectron2
+
+  # Install other dependencies
+  pip3 install git+https://github.com/cocodataset/panopticapi.git
+  pip3 install git+https://github.com/mcordts/cityscapesScripts.git
+  pip3 install -r requirements.txt
+  ```
+
+- Run make.sh file.
+  ```bash
+  cd oneformer/modeling/pixel_decoder/ops
+  sh make.sh
+  cd ~
+  cd Oneformer
+  ```
+  
+- Download pretrained weights.
+  ```bash
+  mkdir checkpoints
+  cd checkpoints
+
+  # Download weights of DiNAT model pretrained with COCO dataset
+  wgest https://shi-labs.com/projects/oneformer/coco/150_16_dinat_l_oneformer_coco_100ep.pth
+  
+  cd ..
+  ```
+
+### Segmentation Inference
+
+- Run segmentation inference
+```bash
+cd inference
+
+# Chop video into frames
+python video2frames.py --path {your video path e.g. vids/P00_OBS.mkv} --fps {e.g. 15} --id {participant ID e.g. P00}
+
+# Resize each extracted frame
+python resize.py --in_dir {your frames path e.g. frames_fps15} --scale 0.5 0.5
+
+# Run inference and record
+python inference.py --in_dir {your frames path e.g. frames_fps15/resized} --gaze_path {Path to the gaze data e.g. gaze_data/gaze_projection} --model dinat --prior coco --task semantic
 ```
 
 ## Acknowledgement
