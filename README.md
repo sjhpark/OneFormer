@@ -155,7 +155,6 @@ If you found OneFormer useful in your research, please consider starring ⭐ us 
   cd ..
   
   # Then, open bashrc and set path:
-  nano ~/.bashrc
   # Paste below into bashrc:
   # export PATH=/usr/local/cuda-11.3/bin${PATH:+:${PATH}}
   # export LD_LIBRARY_PATH=/usr/local/cuda-11.3/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
