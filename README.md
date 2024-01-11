@@ -157,8 +157,10 @@ If you found OneFormer useful in your research, please consider starring ⭐ us 
   # Then, open bashrc and set path:
   nano ~/.bashrc
   # Paste below into bashrc:
-  export PATH=/usr/local/cuda-11.3/bin${PATH:+:${PATH}}
-  export LD_LIBRARY_PATH=/usr/local/cuda-11.3/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+  # export PATH=/usr/local/cuda-11.3/bin${PATH:+:${PATH}}
+  # export LD_LIBRARY_PATH=/usr/local/cuda-11.3/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+  echo 'export PATH=/usr/local/cuda-11.3/bin${PATH:+:${PATH}}' >> ~/.bashrc
+  echo 'export LD_LIBRARY_PATH=/usr/local/cuda-11.3/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> ~/.bashrc
 
   # Executes the content of the file passed as an argument in the current shell
   source ~/.bashrc
