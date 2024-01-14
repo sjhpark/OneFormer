@@ -13,6 +13,7 @@ from tqdm import tqdm
 import moviepy.editor
 from termcolor import colored
 from natsort import natsorted
+import gc
 
 import warnings
 warnings.filterwarnings("ignore") # Turn off all warnings
@@ -91,7 +92,7 @@ def process_frame(img, predictor):
     predictions = predictor(img, "semantic")
     pixel_classes = predictions["sem_seg"].argmax(dim=0).to('cpu') # 2D image of pixel classes
     return np.stack([pixel_classes, pixel_classes, pixel_classes], axis=2)
-
+    
 def process_frames(input_chunk, predictor):
     # Get capture
     pid = input_chunk[0][0][0]
@@ -106,7 +107,7 @@ def process_frames(input_chunk, predictor):
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
         img = cap.read()[1]
         res.append(process_frame(img, predictor))
-
+    
     cap.release()
     
     # Create mp4 of result
@@ -114,11 +115,12 @@ def process_frames(input_chunk, predictor):
     fname = os.path.join('obs_videos_temp', f"{pid}_segmented_{start_frame}.mp4")
     out_clip = moviepy.editor.ImageSequenceClip(res, fps=fps)
     out_clip.write_videofile(fname, verbose=False, logger=None)
+    gc.collect()
     return fname
 
 def process_video(pid, data_df, predictor):
     inputs = [(pid, data_df['obs_frame_num'].iloc[i]) for i in range(len(data_df))]
-    CHUNK_SIZE = 500
+    CHUNK_SIZE = 20
     input_chunks = [[inputs[i:i+CHUNK_SIZE]] for i in range(0, len(inputs), CHUNK_SIZE)]
 
     outputs = list(tqdm(itertools.starmap(process_frames, zip(input_chunks, itertools.repeat(predictor))), desc="Processing frames", total=len(input_chunks)))
@@ -133,9 +135,6 @@ def process_video(pid, data_df, predictor):
 def run_obs_segmentation(pid:str, predictor): 
     # Skip if the output file already exists
     out_fname = os.path.join('obs_videos_segmented', f"{pid}_segmented.mp4")
-    if os.path.exists(out_fname) and not overwrite:
-        print(colored(f"Skipping {pid} because output file already exists", 'yellow'))
-        return
 
     # Extract frame_corrs
     # Columns are timestamp, obs_frame_num, glasses_frame_num, glasses_gaze_x, glasses_gaze_y
@@ -176,6 +175,4 @@ if __name__ == '__main__':
     if not os.path.exists("obs_videos_segmented"):
         os.makedirs("obs_videos_segmented")
     
-    start_time = time.time()
     main()
-    print(f"Time taken: {time.time() - start_time} seconds")
