@@ -120,30 +120,25 @@ def process_frames(input_chunk, predictor):
 
 def process_video(pid, data_df, predictor):
     inputs = [(pid, data_df['obs_frame_num'].iloc[i]) for i in range(len(data_df))]
-    CHUNK_SIZE = 20
+    CHUNK_SIZE = 500
     input_chunks = [[inputs[i:i+CHUNK_SIZE]] for i in range(0, len(inputs), CHUNK_SIZE)]
 
     outputs = list(tqdm(itertools.starmap(process_frames, zip(input_chunks, itertools.repeat(predictor))), desc="Processing frames", total=len(input_chunks)))
     out_clips = [moviepy.editor.VideoFileClip(out) for out in outputs]
     combined_clip = moviepy.editor.concatenate_videoclips(out_clips)
-    fname = os.path.join('obs_videos_temp', f"{pid}_segmented_full.mp4")
+    fname = os.path.join('obs_videos_temp', f"{pid}_segmented.mp4")
     combined_clip.write_videofile(fname, verbose=False, logger=None)
 
     with open(fname, 'rb') as f:
         return f.read()
 
 def run_obs_segmentation(pid:str, predictor): 
-    # Skip if the output file already exists
-    out_fname = os.path.join('obs_videos_segmented', f"{pid}_segmented.mp4")
-
     # Extract frame_corrs
     # Columns are timestamp, obs_frame_num, glasses_frame_num, glasses_gaze_x, glasses_gaze_y
     data_df = pd.read_csv(os.path.join('frame_pairs', f"{pid}_frame_corrs.csv"))
 
     # Run segmentation modal
-    output_data = process_video(pid, data_df, predictor)
-    with open(out_fname, 'wb') as f:
-        f.write(output_data)
+    process_video(pid, data_df, predictor)
 
 def main():
     parser = argparse.ArgumentParser(description="oneformer demo for builtin configs")
