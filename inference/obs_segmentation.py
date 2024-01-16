@@ -167,7 +167,5 @@ if __name__ == '__main__':
     # create obs_videos_temp & obs_videos_segmented directories
     if not os.path.exists("obs_videos_temp"):
         os.makedirs("obs_videos_temp")
-    if not os.path.exists("obs_videos_segmented"):
-        os.makedirs("obs_videos_segmented")
     
     main()
