@@ -4,6 +4,8 @@
 import os
 import sys
 import cv2
+import glob
+import natsort
 import argparse
 import itertools
 import numpy as np
@@ -107,28 +109,38 @@ def process_frames(input_chunk, predictor):
     cap.release()
     
     # Create mkv of result
-    start_frame = input_chunk[0][1]
-    fname = os.path.join('obs_videos_temp', f"{pid}_segmented_{start_frame}.mkv")
-    fourcc = cv2.VideoWriter_fourcc(*'FFV1') # codec for lossless compression (pixel values will be preserved)
+    start_frame = input_chunk[0][0]
+    fname = os.path.join('obs_videos_segmented', f"{pid}_segmented_{start_frame}.mkv")
     height , width , channel =  res[0].shape
+    fourcc = cv2.VideoWriter_fourcc(*'FFV1') # codec for lossless compression (pixel values will be preserved)
     video = cv2.VideoWriter(fname, fourcc, fps, (width,height))
     for i in range(len(res)):
         video.write(res[i])
+    video.release()
     gc.collect() # empty unused memory
     return fname
 
 def process_video(pid, data_df, predictor):
     inputs = [(pid, data_df['obs_frame_num'].iloc[i]) for i in range(len(data_df))]
-    CHUNK_SIZE = 2
+    CHUNK_SIZE = 500
     input_chunks = [[inputs[i:i+CHUNK_SIZE]] for i in range(0, len(inputs), CHUNK_SIZE)]
 
     outputs = list(tqdm(itertools.starmap(process_frames, zip(input_chunks, itertools.repeat(predictor))), desc="Processing frames", total=len(input_chunks)))
     
-    fname = os.path.join('obs_videos_temp', f"{pid}_segmented.mkv")
-    with open(fname, 'wb') as f:
-        for out in outputs:
-            with open(out, 'rb') as f2:
-                f.write(f2.read())
+    fps = cv2.VideoCapture(outputs[0]).get(cv2.CAP_PROP_FPS)
+    height , width , channel =  cv2.VideoCapture(outputs[0]).read()[1].shape
+    segmented_fname = os.path.join('obs_videos_segmented', f"{pid}_segmented.mkv")
+    fourcc = cv2.VideoWriter_fourcc(*'FFV1') # codec for lossless compression (pixel values will be preserved)
+    segmented_video = cv2.VideoWriter(segmented_fname, fourcc, fps, (width,height))
+    for chunk_fname in outputs:
+        vid_cap = cv2.VideoCapture(chunk_fname)
+        while vid_cap.isOpened():
+            res, frame = vid_cap.read()
+            if not res:
+                break
+            segmented_video.write(frame)
+        vid_cap.release()
+        os.remove(chunk_fname) # remove video of chunk
 
 def run_obs_segmentation(pid:str, predictor): 
     # Extract frame_corrs
@@ -162,8 +174,7 @@ def main():
     run_obs_segmentation(args.id, predictor)
 
 if __name__ == '__main__':
-    # create obs_videos_temp & obs_videos_segmented directories
-    if not os.path.exists("obs_videos_temp"):
-        os.makedirs("obs_videos_temp")
-    
+    # create save dir
+    if not os.path.exists("obs_videos_segmented"):
+        os.makedirs("obs_videos_segmented")
     main()
