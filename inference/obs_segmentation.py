@@ -4,15 +4,12 @@
 import os
 import sys
 import cv2
-import time
 import argparse
 import itertools
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-import moviepy.editor
 from termcolor import colored
-from natsort import natsorted
 import gc
 
 import warnings
@@ -24,7 +21,6 @@ logging.getLogger("tqdm").setLevel(logging.INFO) # Enable tqdm logging
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from demo.defaults import DefaultPredictor
-from demo.visualizer import Visualizer, ColorMode
 
 # import OneFormer Project
 from oneformer import (
@@ -91,7 +87,7 @@ def setup_modules(dataset, model_path, use_swin):
 def process_frame(img, predictor):
     predictions = predictor(img, "semantic")
     pixel_classes = predictions["sem_seg"].argmax(dim=0).to('cpu') # 2D image of pixel classes
-    return np.stack([pixel_classes, pixel_classes, pixel_classes], axis=2)
+    return np.stack([pixel_classes, pixel_classes, pixel_classes], axis=2).astype(np.uint8)
     
 def process_frames(input_chunk, predictor):
     # Get capture
@@ -110,27 +106,29 @@ def process_frames(input_chunk, predictor):
     
     cap.release()
     
-    # Create mp4 of result
+    # Create mkv of result
     start_frame = input_chunk[0][1]
-    fname = os.path.join('obs_videos_temp', f"{pid}_segmented_{start_frame}.mp4")
-    out_clip = moviepy.editor.ImageSequenceClip(res, fps=fps)
-    out_clip.write_videofile(fname, verbose=False, logger=None)
-    gc.collect()
+    fname = os.path.join('obs_videos_temp', f"{pid}_segmented_{start_frame}.mkv")
+    fourcc = cv2.VideoWriter_fourcc(*'FFV1') # codec for lossless compression (pixel values will be preserved)
+    height , width , channel =  res[0].shape
+    video = cv2.VideoWriter(fname, fourcc, fps, (width,height))
+    for i in range(len(res)):
+        video.write(res[i])
+    gc.collect() # empty unused memory
     return fname
 
 def process_video(pid, data_df, predictor):
     inputs = [(pid, data_df['obs_frame_num'].iloc[i]) for i in range(len(data_df))]
-    CHUNK_SIZE = 500
+    CHUNK_SIZE = 2
     input_chunks = [[inputs[i:i+CHUNK_SIZE]] for i in range(0, len(inputs), CHUNK_SIZE)]
 
     outputs = list(tqdm(itertools.starmap(process_frames, zip(input_chunks, itertools.repeat(predictor))), desc="Processing frames", total=len(input_chunks)))
-    out_clips = [moviepy.editor.VideoFileClip(out) for out in outputs]
-    combined_clip = moviepy.editor.concatenate_videoclips(out_clips)
-    fname = os.path.join('obs_videos_temp', f"{pid}_segmented.mp4")
-    combined_clip.write_videofile(fname, verbose=False, logger=None)
-
-    with open(fname, 'rb') as f:
-        return f.read()
+    
+    fname = os.path.join('obs_videos_temp', f"{pid}_segmented.mkv")
+    with open(fname, 'wb') as f:
+        for out in outputs:
+            with open(out, 'rb') as f2:
+                f.write(f2.read())
 
 def run_obs_segmentation(pid:str, predictor): 
     # Extract frame_corrs
